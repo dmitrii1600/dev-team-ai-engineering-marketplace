@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "dev-team-ai-engineering-marketplace",
+  "description": "Claude Code plugins for the dev team: shared skills, agents and workflows for AI-assisted engineering.",
+  "owner": {
+    "name": "Dmytro Shevchenko",
+    "url": "https://github.com/dmitrii1600"
+  },
+  "plugins": [
+    {
+      "name": "dev-workflow",
+      "source": "./plugins/dev-workflow",
+      "description": "Team development workflow: Conventional Commits messages and a read-only code reviewer agent.",
+      "category": "development",
+      "tags": ["git", "commits", "code-review"]
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Bump deliberately: newer CLIs can add validation rules.
+  CLAUDE_CODE_VERSION: 2.1.300
+  DISABLE_AUTOUPDATER: "1"
+
+jobs:
+  validate:
+    name: Manifests and frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install Claude Code CLI
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Validate marketplace
+        run: claude plugin validate . --strict
+      - name: Validate each plugin
+        run: |
+          for dir in plugins/*/; do
+            echo "::group::$dir"
+            claude plugin validate "$dir" --strict
+            echo "::endgroup::"
+          done
+      - name: Repo checks
+        run: node .github/scripts/check-marketplace.mjs
+
+  version-bump:
+    name: Version bumped
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: node .github/scripts/check-version-bump.mjs "origin/${{ github.base_ref }}"
+
+  install:
+    name: Install smoke test (${{ matrix.os }})
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows catches path and line-ending problems in hooks and scripts.
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install Claude Code CLI
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: Add marketplace from checkout
+        run: claude plugin marketplace add ./
+      - name: Install every plugin
+        run: |
+          marketplace=$(node -p "require('./.claude-plugin/marketplace.json').name")
+          for plugin in $(node -p "require('./.claude-plugin/marketplace.json').plugins.map(p => p.name).join(' ')"); do
+            echo "::group::$plugin"
+            claude plugin install "$plugin@$marketplace" --scope user -y
+            claude plugin details "$plugin"
+            echo "::endgroup::"
+          done
+      - name: List installed plugins
+        run: claude plugin list

@@ -1,0 +1,15 @@
+# Default owner for everything in the marketplace.
+*                              @dmitrii1600
+
+# Catalog changes affect every user.
+/.claude-plugin/               @dmitrii1600
+
+# Code that runs on users' machines outside the sandbox: needs explicit review.
+**/hooks/                      @dmitrii1600
+**/.mcp.json                   @dmitrii1600
+**/.lsp.json                   @dmitrii1600
+**/scripts/                    @dmitrii1600
+**/bin/                        @dmitrii1600
+
+# Per-plugin owners.
+/plugins/dev-workflow/         @dmitrii1600

@@ -1,10 +1,13 @@
 /**
  * Run the same eval pattern N times to measure stability (LLM evals are probabilistic — one
  * green run proves little). Wraps `vitest run`, so vitest flags (-t, path patterns) pass through;
- * only -n/--times and --label are consumed here. Aggregates the records written during the runs
- * into per-test pass rate, a per-practice breakdown, and metric stats (mean ± stddev).
+ * only -n/--times, --allow-more and --label are consumed here. Aggregates the records written
+ * during the runs into per-test pass rate, a per-practice breakdown, and metric stats
+ * (median [min–max] first, mean ± stddev as the secondary figure).
  *
- *   npm run eval:repeat -- plugins/engineering-paved-path/evals/onion-architecture -n 5 --label baseline
+ *   npm run eval:repeat -- plugins/engineering-paved-path/evals/onion-architecture -n 5 --allow-more --label baseline
+ *
+ * -n is capped at 2 to bound token spend; --allow-more lifts the cap.
  *
  * --label saves the aggregate to results/repeat-<label>.json so two labeled series can be diffed
  * with `npm run eval:delta -- baseline candidate`.
@@ -12,11 +15,21 @@
 
 import { mkdirSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { GREEN, RED, DIM, RESET, rateColor } from "./ansi.js";
+import { GREEN, RED, YELLOW, DIM, RESET, rateColor } from "./ansi.js";
 import { gitInfo } from "./git.js";
 import { countTests, runVitestOnce } from "./run-vitest.js";
 import { REPO_ROOT, RESULTS_DIR } from "./artifacts/paths.js";
-import { aggregate, loadRecords, recordCount, type NodeAggregate, type Stats } from "./records/stats.js";
+import {
+  aggregate,
+  formatMetric,
+  loadRecords,
+  METRIC_KEYS,
+  METRIC_LABELS,
+  recordCount,
+  type MetricKey,
+  type NodeAggregate,
+  type Stats,
+} from "./records/stats.js";
 
 /**
  * vitest treats a path pattern as a SUBSTRING filter, so a bare `evals/architecture-reviewer`
@@ -53,8 +66,14 @@ function resolveEvalPatterns(args: string[]): string[] {
 }
 
 const pct = (rate: number) => `${Math.round(rate * 100)}%`;
-const statLine = (label: string, s: Stats) =>
-  `      ${label}: ${s.mean.toFixed(0)} ± ${s.stddev.toFixed(0)} [${s.min}–${s.max}]`;
+/** `median [min–max]`, with mean ± stddev as the dimmed secondary figure. */
+const statLine = (key: MetricKey, s: Stats) => {
+  const f = (v: number) => formatMetric(key, v);
+  return (
+    `      ${METRIC_LABELS[key].padEnd(11)}: ${f(s.median)} [${f(s.min)}–${f(s.max)}]` +
+    `  ${DIM}mean ${f(s.mean)} ± ${f(s.stddev)}${RESET}`
+  );
+};
 
 function printTest(agg: NodeAggregate, times: number): void {
   const shortId = agg.nodeid.split(" > ").slice(-1)[0];
@@ -65,32 +84,36 @@ function printTest(agg: NodeAggregate, times: number): void {
       console.log(`      ${rateColor(s.rate)}${s.passed}/${s.total} ${pct(s.rate).padStart(4)}${RESET}  ${text}`);
     }
   }
-  console.log(statLine("turns   ", agg.metrics.numTurns));
-  console.log(statLine("duration", agg.metrics.durationMs));
-  console.log(statLine("tok_out ", agg.metrics.outputTokens));
-  if (times < 5) console.log(`      ${DIM}(n=${times}: stddev indicative only)${RESET}`);
+  for (const key of METRIC_KEYS) console.log(statLine(key, agg.metrics[key]));
+  if (times < 5) console.log(`      ${DIM}(n=${times}: median and stddev indicative only)${RESET}`);
 }
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  // Cap runs at 2 to keep token spend bounded — LLM sessions are expensive, and 2 runs is enough
-  // to catch a blatantly flaky case. Bump MAX_TIMES if you deliberately want a fuller stability run.
+  // Cap runs at 2 by default to keep token spend bounded — LLM sessions are expensive, and 2 runs
+  // is enough to catch a blatantly flaky case. --allow-more lifts the cap for a deliberate
+  // stability run or a cost baseline (a median needs more than 2 samples to mean much).
   const MAX_TIMES = 2;
   let times = MAX_TIMES;
+  let allowMore = false;
   let label: string | undefined;
   const vitestArgs: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-n" || a === "--times") times = Number(argv[++i]);
+    else if (a === "--allow-more") allowMore = true;
     else if (a === "--label") label = argv[++i];
     else vitestArgs.push(a);
   }
   if (vitestArgs.length === 0 || !Number.isFinite(times) || times < 1) {
-    console.error("usage: npm run eval:repeat -- <vitest pattern> [-n times<=2] [-t testNamePattern] [--label name]");
+    console.error("usage: npm run eval:repeat -- <vitest pattern> [-n times] [--allow-more] [-t testNamePattern] [--label name]");
     process.exit(1);
   }
-  if (times > MAX_TIMES) {
-    console.error(`  ${DIM}capping -n ${times} → ${MAX_TIMES} (token economy)${RESET}`);
+  if (times > MAX_TIMES && !allowMore) {
+    console.error(
+      `  ${YELLOW}capped -n ${times} → ${MAX_TIMES} to bound token spend. ` +
+        `Add --allow-more to run all ${times}.${RESET}`,
+    );
     times = MAX_TIMES;
   }
   vitestArgs.splice(0, vitestArgs.length, ...resolveEvalPatterns(vitestArgs));

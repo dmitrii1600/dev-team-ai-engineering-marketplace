@@ -24,7 +24,8 @@ export function logTrace(label: string, result: Result): void {
   const m = result.metrics;
   console.log(
     `    metrics:   ${result.numTurns} turns · ${m.durationMs}ms · ` +
-      `${m.inputTokens}→${m.outputTokens} tok · ${m.toolCallCount} tool calls`,
+      `${m.inputTokens}→${m.outputTokens} tok (cache ${m.cacheReadTokens} read / ${m.cacheCreationTokens} write) · ` +
+      `${m.apiCalls} API calls · ${m.toolCallCount} tool calls · $${m.costUsd.toFixed(4)}`,
   );
   const preview = result.text.slice(0, 300).replace(/\n/g, " ");
   console.log(`    ${DIM}text: ${preview}${result.text.length > 300 ? "…" : ""}${RESET}`);

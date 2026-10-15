@@ -11,10 +11,22 @@ import { subscriptionEnv } from "./env.js";
 
 export interface Metrics {
   durationMs: number;
+  /** Uncached input tokens (cache reads/writes are reported separately below). */
   inputTokens: number;
   outputTokens: number;
+  /** Input tokens served from the prompt cache. */
+  cacheReadTokens: number;
+  /** Input tokens written to the prompt cache. */
+  cacheCreationTokens: number;
+  /** Distinct API responses in the session (NOT the same as numTurns, which counts messages). */
+  apiCalls: number;
   /** Total tool_use blocks seen (NOT deduplicated — a measure of work done). */
   toolCallCount: number;
+  /**
+   * Cost in USD as reported by the SDK. On the subscription backend nothing is billed per token,
+   * so this is an API-price ESTIMATE, not money charged — use it for relative comparison only.
+   */
+  costUsd: number;
 }
 
 export interface Result {
@@ -104,15 +116,26 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
   let numTurns = 0;
   let toolCallCount = 0;
   // Resource metrics, read defensively off the result message (field names verified against the
-  // installed SDK's types). On the subscription path total_cost_usd is meaningless, so we ignore
-  // it and surface tokens only. Fall back to 0 whenever a field is absent — never throw.
+  // installed SDK's types). total_cost_usd is an API-price ESTIMATE on the subscription backend
+  // (nothing is billed per token there) — not money charged, but comparable between runs. Fall
+  // back to 0 whenever a field is absent — never throw.
   let durationMs = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
+  let costUsd = 0;
   let stoppedEarly = false;
+  let resultReceived = false;
+  // The SDK streams one `assistant` message per content block, and blocks of one API response
+  // share `message.id` (each repeating that response's usage). Keep the latest usage per id, so
+  // the number of keys is the number of API calls and summing the values never double-counts.
+  // A message without an id counts as its own call.
+  const usageById = new Map<string, any>();
+  let anonCalls = 0;
   // Wall-clock fallback: on an early stop we break before the result message that carries
-  // duration_ms/usage, so those stay 0. Stamp duration ourselves, and accumulate output tokens
-  // off each assistant message, so an early-stopped case still reports meaningful metrics.
+  // duration_ms/usage, so those stay 0. Stamp duration ourselves, and sum token usage off the
+  // assistant messages, so an early-stopped case still reports meaningful metrics.
   const startedAt = Date.now();
 
   // The SDK throws on an error result (e.g. max-turns). We still want the partial output
@@ -121,7 +144,9 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
     loop: for await (const msg of query({ prompt, options })) {
       if (msg.type === "assistant") {
         numTurns++;
-        outputTokens += (msg.message as any).usage?.output_tokens ?? 0;
+        const id = (msg.message as any).id;
+        if (id) usageById.set(id, (msg.message as any).usage ?? {});
+        else usageById.set(`anon-${anonCalls++}`, (msg.message as any).usage ?? {});
         for (const block of msg.message.content as any[]) {
           if (block.type === "text") textParts.push(block.text);
           else if (block.type === "tool_use") {
@@ -162,8 +187,23 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
         const m = msg as any;
         numTurns = m.num_turns ?? 0;
         durationMs = m.duration_ms ?? 0;
-        inputTokens = m.usage?.input_tokens ?? 0;
-        outputTokens = m.usage?.output_tokens ?? 0;
+        costUsd = m.total_cost_usd ?? 0;
+        // `usage` covers the MAIN agent loop only; `modelUsage` also includes Task subagents and
+        // internal calls, so prefer it for token accounting and fall back to `usage` when absent.
+        const perModel = Object.values(m.modelUsage ?? {}) as any[];
+        if (perModel.length > 0) {
+          const sum = (k: string) => perModel.reduce((a, u) => a + (u?.[k] ?? 0), 0);
+          inputTokens = sum("inputTokens");
+          outputTokens = sum("outputTokens");
+          cacheReadTokens = sum("cacheReadInputTokens");
+          cacheCreationTokens = sum("cacheCreationInputTokens");
+        } else {
+          inputTokens = m.usage?.input_tokens ?? 0;
+          outputTokens = m.usage?.output_tokens ?? 0;
+          cacheReadTokens = m.usage?.cache_read_input_tokens ?? 0;
+          cacheCreationTokens = m.usage?.cache_creation_input_tokens ?? 0;
+        }
+        resultReceived = true;
         if (m.result) resultText = m.result;
       }
     }
@@ -176,6 +216,16 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
 
   // Early stop never reached the result message, so fall back to the wall-clock duration.
   if (stoppedEarly && durationMs === 0) durationMs = Date.now() - startedAt;
+  // No result message (early stop, or the SDK threw first): tokens come from the assistant
+  // messages seen so far, so they cover only what ran before the stop.
+  if (!resultReceived) {
+    for (const u of usageById.values()) {
+      inputTokens += u.input_tokens ?? 0;
+      outputTokens += u.output_tokens ?? 0;
+      cacheReadTokens += u.cache_read_input_tokens ?? 0;
+      cacheCreationTokens += u.cache_creation_input_tokens ?? 0;
+    }
+  }
 
   return {
     text: resultText || textParts.join("\n"),
@@ -185,6 +235,15 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
     filesRead: reads,
     numTurns,
     isError,
-    metrics: { durationMs, inputTokens, outputTokens, toolCallCount },
+    metrics: {
+      durationMs,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+      apiCalls: usageById.size,
+      toolCallCount,
+      costUsd,
+    },
   };
 }

@@ -41,8 +41,8 @@ Only the header (`sed -n 1,12p`) and a few `grep`s — so these must be exact:
 
 ## The plan file
 
-The template `sdd-engineering:implementation-planner` writes. Its agent body is the
-source of truth; this copy is for people reading and reviewing plans.
+The template `sdd-engineering:implementation-planner` writes. This file is the source of
+truth: the planner reads it before writing a plan, and people read it to review one.
 
 ```
 # Implementation Plan: <task>

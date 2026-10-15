@@ -78,6 +78,74 @@ const checkComponents = (pluginName, pluginDir) => {
     fail(`plugins/${pluginName}/CLAUDE.md is not loaded by Claude Code; move it into a skill`);
 };
 
+// The subset of node-semver ranges this repo uses: exact, =, >=, ^ and ~ (partial
+// versions such as ^2.0 allowed). Anything else is reported so the check stays honest.
+const RANGE = /^(\^|~|>=|=)?(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
+const satisfies = (range, version) => {
+  const r = range.trim().match(RANGE);
+  if (!r) return undefined;
+  const [, op = "=", ...parts] = r;
+  const want = parts.map((p) => (p === undefined ? undefined : Number(p)));
+  const [M, m, p] = want.map((n) => n ?? 0);
+  const v = version.split(/[-+]/)[0].split(".").map(Number);
+  const cmp = (a, b) => a.reduce((acc, x, i) => acc || Math.sign(x - b[i]), 0);
+  if (cmp(v, [M, m, p]) < 0) return false;
+  if (op === ">=") return true;
+  if (op === "=") return want.every((n, i) => n === undefined || n === v[i]);
+  if (op === "~") return v[0] === M && (want[1] === undefined || v[1] === m);
+  // ^: the left-most non-zero part is fixed
+  if (M > 0 || want[1] === undefined) return v[0] === M;
+  if (m > 0 || want[2] === undefined) return v[0] === 0 && v[1] === m;
+  return v[0] === 0 && v[1] === 0 && v[2] === p;
+};
+
+// `dependencies` items are "name", "name@marketplace" or { name, version?, marketplace? }.
+// Same-marketplace dependencies must exist, satisfy their range and form no cycle.
+const checkDependencies = (manifests) => {
+  const edges = new Map();
+  for (const [name, manifest] of manifests) {
+    const deps = manifest.dependencies ?? [];
+    if (!Array.isArray(deps)) {
+      fail(`plugins/${name}: "dependencies" must be an array`);
+      continue;
+    }
+    edges.set(name, []);
+    for (const dep of deps) {
+      const item = typeof dep === "string" ? { name: dep } : dep ?? {};
+      const [depName, market] =
+        typeof dep === "string" && dep.includes("@") ? dep.split("@") : [item.name, item.marketplace];
+      const label = `plugins/${name} › dependency ${depName}`;
+      if (market && market !== marketplace.name) {
+        fail(`${label}: cross-marketplace dependencies need "allowCrossMarketplaceDependenciesOn" and a review`);
+        continue;
+      }
+      const target = manifests.get(depName);
+      if (!target) {
+        fail(`${label}: not listed in marketplace.json`);
+        continue;
+      }
+      edges.get(name).push(depName);
+      if (item.version === undefined) continue;
+      const ok = satisfies(item.version, target.version ?? "");
+      if (ok === undefined) fail(`${label}: unsupported range "${item.version}" (use ^, ~, >=, = or exact)`);
+      else if (!ok) fail(`${label}: range ${item.version} is not satisfied by ${depName} ${target.version}`);
+    }
+  }
+
+  const state = new Map();
+  const visit = (name, path) => {
+    if (state.get(name) === "done") return;
+    if (state.get(name) === "active") {
+      fail(`dependency cycle: ${[...path.slice(path.indexOf(name)), name].join(" -> ")}`);
+      return;
+    }
+    state.set(name, "active");
+    for (const next of edges.get(name) ?? []) visit(next, [...path, name]);
+    state.set(name, "done");
+  };
+  for (const name of edges.keys()) visit(name, []);
+};
+
 const marketplace = readJson(MARKETPLACE);
 if (marketplace) {
   const entries = marketplace.plugins ?? [];
@@ -90,6 +158,7 @@ if (marketplace) {
   if (dupes.length) fail(`marketplace.json: duplicate plugin names: ${[...new Set(dupes)].join(", ")}`);
 
   const listedDirs = new Set();
+  const manifests = new Map();
   for (const entry of entries) {
     const label = `marketplace.json › ${entry.name}`;
     if (entry.version !== undefined)
@@ -122,11 +191,14 @@ if (marketplace) {
     if (!existsSync(join(pluginDir, "CHANGELOG.md"))) fail(`${label}: CHANGELOG.md is missing`);
 
     checkComponents(entry.name, pluginDir);
+    manifests.set(entry.name, manifest);
   }
 
   for (const dir of listDirs(PLUGINS_DIR)) {
     if (!listedDirs.has(dir)) fail(`plugins/${dir} is not listed in marketplace.json`);
   }
+
+  checkDependencies(manifests);
 }
 
 if (errors.length) {

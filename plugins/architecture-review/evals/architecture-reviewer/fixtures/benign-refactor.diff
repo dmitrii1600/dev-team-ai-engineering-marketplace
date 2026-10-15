@@ -1,0 +1,16 @@
+diff --git a/src/orders/application/summary.ts b/src/orders/application/summary.ts
+index eeeeeee..fffffff 100644
+--- a/src/orders/application/summary.ts
++++ b/src/orders/application/summary.ts
+@@ -1,10 +1,12 @@
+ export interface OrderRow {
+   id: string;
+   total: number;
+ }
+
+-export function summarize(rows: OrderRow[]) {
+-  return rows.map((r) => ({ id: r.id, total: r.total }));
++// Renamed locals for readability; behaviour unchanged.
++export function summarize(rows: OrderRow[]) {
++  return rows.map((row) => ({ id: row.id, total: row.total }));
+ }

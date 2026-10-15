@@ -35,6 +35,18 @@
 - **Any change under `plugins/<name>/` requires a `version` bump** and an entry in the plugin's `CHANGELOG.md`. Without a new version number users never receive the update. CI enforces this.
 - Patch for fixes, minor for new skills or agents, major for breaking changes (a skill removed or renamed, changed hook behaviour).
 
+### Dependencies between plugins
+
+- Declare them in `plugin.json` only: `"dependencies": [{ "name": "engineering-paved-path", "version": "^1.0.0" }]`. A bare name resolves in this marketplace. Claude Code installs and enables dependencies together with the plugin.
+- Reference another plugin's components by namespaced name, everywhere: `engineering-paved-path:onion-architecture` in a skill body or in an agent's `skills:` (a bare name in `skills:` silently fails to load), `architecture-review:architecture-reviewer` as an agent type. Never by file path: another plugin's directory is not reachable after installation.
+- A dependency published at `1.x` is consumed with `^1.0.0`; `^0.x` would lock consumers to one minor version, so plugins that others depend on start at `1.0.0`.
+- Removing or renaming a skill or agent that another plugin uses is a major bump, and the dependent plugin widens its range in the same pull request.
+- CI checks that every dependency is listed in `marketplace.json`, that its current version satisfies the range and that there is no cycle.
+
+### Portability
+
+Plugins are used by many projects. Skills, agents, scripts, READMEs and evals must not name a particular project, its packages or repository, or hard-code its paths (`server/src/...`, a fixed list of spec folders). Describe paths by role or take them from the plugin's configuration; reference bundled scripts as `"${CLAUDE_SKILL_DIR}/scripts/x.mjs"`.
+
 ### Files and paths
 
 - Components (`skills/`, `agents/`, `hooks/`, `.mcp.json`) live at the **plugin root**, not inside `.claude-plugin/`.
@@ -86,4 +98,4 @@ After merging to `main`, create a version tag:
 claude plugin tag plugins/<your-plugin> --push
 ```
 
-It validates the plugin and creates a `<your-plugin>--v<version>` tag.
+It validates the plugin and creates a `<your-plugin>--v<version>` tag. Dependency ranges are resolved against these tags, so tag dependencies before the plugins that use them: `engineering-paved-path` and `research-tools`, then `architecture-review`, then `sdd-engineering`.

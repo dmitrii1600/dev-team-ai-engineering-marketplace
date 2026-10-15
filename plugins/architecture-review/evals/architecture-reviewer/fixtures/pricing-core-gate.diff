@@ -1,0 +1,20 @@
+diff --git a/packages/pricing-core/src/quote.ts b/packages/pricing-core/src/quote.ts
+index ccccccc..ddddddd 100644
+--- a/packages/pricing-core/src/quote.ts
++++ b/packages/pricing-core/src/quote.ts
+@@ -1,4 +1,5 @@
+ import type { QuoteInput, Quote } from "./types.js";
++import { readFileSync } from "node:fs";
+ import { draftLines } from "./draft.js";
+ import { mergeLines } from "./merge.js";
+ import { applyDiscountCaps } from "./caps.js";
+@@ -6,9 +7,10 @@ import { applyDiscountCaps } from "./caps.js";
+ export function buildQuote(input: QuoteInput): Quote {
+   const rates = input.rates;
++  const overrides = readFileSync(input.overridesPath, "utf8");
+   const drafted = draftLines(input, rates);
+   const merged = mergeLines(drafted);
+-  const capped = applyDiscountCaps(merged, input.policy);
+-  return capped;
++  return merged;
+ }

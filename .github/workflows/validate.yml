@@ -40,6 +40,12 @@ jobs:
           done
       - name: Repo checks
         run: node .github/scripts/check-marketplace.mjs
+      - name: No project-specific paths in plugins
+        run: |
+          if grep -rniE '\.devdigest|devdigest|dev-digest|scripts/verify\.mjs|\.claude/(skills|agents)/' plugins/; then
+            echo "::error::plugins must not reference a specific project or its paths (CONTRIBUTING.md, Portability)"
+            exit 1
+          fi
 
   version-bump:
     name: Version bumped

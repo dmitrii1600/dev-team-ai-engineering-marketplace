@@ -8,11 +8,39 @@
   },
   "plugins": [
     {
+      "name": "architecture-review",
+      "source": "./plugins/architecture-review",
+      "description": "Read-only architecture boundary review: layers, placement and imports checked against the paved-path architecture skills, with path:line evidence.",
+      "category": "development",
+      "tags": ["architecture", "code-review", "agents"]
+    },
+    {
       "name": "dev-workflow",
       "source": "./plugins/dev-workflow",
       "description": "Team development workflow: Conventional Commits messages and a read-only code reviewer agent.",
       "category": "development",
       "tags": ["git", "commits", "code-review"]
+    },
+    {
+      "name": "engineering-paved-path",
+      "source": "./plugins/engineering-paved-path",
+      "description": "Shared engineering skills: React, Next.js, Fastify, onion and frontend architecture, React Testing Library, security, and file-to-skill routing.",
+      "category": "development",
+      "tags": ["react", "nextjs", "fastify", "architecture", "testing", "security"]
+    },
+    {
+      "name": "research-tools",
+      "source": "./plugins/research-tools",
+      "description": "Read-only researcher agent for codebase and external questions, returning conclusions with evidence and an explicit could-not-establish list.",
+      "category": "development",
+      "tags": ["research", "agents"]
+    },
+    {
+      "name": "sdd-engineering",
+      "source": "./plugins/sdd-engineering",
+      "description": "Spec Driven Development: spec-creator, implementation-planner, implementer and plan-verifier agents, /run-plan orchestration and /workflow-retro.",
+      "category": "development",
+      "tags": ["sdd", "specs", "planning", "agents", "workflow"]
     }
   ]
 }

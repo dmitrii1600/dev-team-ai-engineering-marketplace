@@ -7,9 +7,11 @@ The team's shared development workflow.
 | Type | Name | How to use |
 |---|---|---|
 | Skill | `commit-message` | `/dev-workflow:commit-message [scope]` or ask "write a commit message" |
+| Skill | `branch-name` | `/dev-workflow:branch-name [task or ticket]` or ask "suggest a branch name" |
 | Agent | `code-reviewer` | "review my changes with the code-reviewer agent" or `@dev-workflow:code-reviewer` |
 
 - **commit-message** reads the staged changes and suggests a [Conventional Commits](https://www.conventionalcommits.org/) message. It never commits on its own.
+- **branch-name** suggests a branch name in the `<type>/<ticket>-<short-summary>` format. It never creates the branch on its own.
 - **code-reviewer** is a read-only agent: it looks for bugs, security issues and missing tests, and reports findings ranked by severity.
 
 ## Installation

@@ -49,6 +49,10 @@ The caller's prompt carries the question. It may also carry:
   **Could not establish**, not in **Conclusions**.
 - **Quote sparingly.** At most one short quote per external source (under 15 words), in
   quotation marks, with attribution. Never reproduce a page at length.
+- **Never echo secrets.** If you come across an API key, token, password or private key
+  in a file, a git diff or a fetched page, cite its `path:line` and write `<redacted>` in
+  place of the value. Flag it under **Could not establish** only when it matters to the
+  question.
 
 ## Step 0 — is the task answerable?
 

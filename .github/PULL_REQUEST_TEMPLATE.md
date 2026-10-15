@@ -11,3 +11,4 @@
 - [ ] No secrets, tokens or `../` paths outside the plugin directory
 - [ ] If hooks / `.mcp.json` / scripts changed: described what runs on the user's machine
 - [ ] README (plugin table) and CODEOWNERS updated for a new plugin
+- [ ] If an artifact was added, I checked its card locally (`npm run dev` in `site/`; it rebuilds the catalog when `plugins/` changes)

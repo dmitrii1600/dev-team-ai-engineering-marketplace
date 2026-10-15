@@ -1,0 +1,8 @@
+{
+  "repo": "dmitrii1600/dev-team-ai-engineering-marketplace",
+  "marketplaceName": "dev-team-ai-engineering-marketplace",
+  "minClaudeCodeVersion": "2.1.300",
+  "defaultBranch": "main",
+  "siteUrl": "https://dmitrii1600.github.io",
+  "basePath": "/dev-team-ai-engineering-marketplace/"
+}

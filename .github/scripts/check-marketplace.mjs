@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Repo-specific checks that `claude plugin validate` does not cover.
 // Usage: node .github/scripts/check-marketplace.mjs
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { listDirs, readFrontmatter, readJson as readJsonFile } from "./lib/frontmatter.mjs";
 
 const ROOT = process.cwd();
 const MARKETPLACE = join(ROOT, ".claude-plugin", "marketplace.json");
@@ -14,38 +15,8 @@ const MAX_SKILL_LINES = 500;
 const errors = [];
 const fail = (msg) => errors.push(msg);
 
-const readJson = (path) => {
-  try {
-    return JSON.parse(readFileSync(path, "utf8"));
-  } catch (err) {
-    fail(`${relative(ROOT, path)}: invalid JSON (${err.message})`);
-    return null;
-  }
-};
-
-// Minimal frontmatter reader: top-level `key: value` pairs plus folded/literal blocks.
-const readFrontmatter = (path) => {
-  const text = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
-  const match = text.match(/^---\n([\s\S]*?)\n---\n/);
-  if (!match) return null;
-  const fields = {};
-  const lines = match[1].split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const kv = lines[i].match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-    if (!kv) continue;
-    let value = kv[2].trim();
-    if (value === ">" || value === "|" || value === ">-" || value === "|-") {
-      const block = [];
-      while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) block.push(lines[++i].trim());
-      value = block.join(" ");
-    }
-    fields[kv[1]] = value.replace(/^["']|["']$/g, "");
-  }
-  return { fields, lineCount: text.split("\n").length };
-};
-
-const listDirs = (dir) =>
-  existsSync(dir) ? readdirSync(dir).filter((d) => statSync(join(dir, d)).isDirectory()) : [];
+const readJson = (path) =>
+  readJsonFile(path, (err) => fail(`${relative(ROOT, path)}: invalid JSON (${err.message})`));
 
 const checkComponents = (pluginName, pluginDir) => {
   for (const skill of listDirs(join(pluginDir, "skills"))) {

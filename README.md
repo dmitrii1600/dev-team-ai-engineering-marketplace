@@ -88,9 +88,13 @@ plugins/<name>/                   one directory per plugin
   evals/                          eval cases and fixtures (when present)
   README.md, CHANGELOG.md
 evals/                            shared eval harness for plugin skills and agents (not shipped)
-.github/                          CI, CODEOWNERS, PR template
+.github/                          CI (validate.yml for the marketplace, site.yml for the website), CODEOWNERS, PR template
+site/                             catalog website: a React + Vite single-page app on GitHub Pages (not part of any plugin)
 docs/specs/                       specifications
+docs/design/                      design prototypes (reference only, not published)
 ```
+
+Catalog website: https://dmitrii1600.github.io/dev-team-ai-engineering-marketplace/ (see [site/README.md](site/README.md)).
 
 ## Contributing
 

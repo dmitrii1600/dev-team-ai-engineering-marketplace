@@ -99,3 +99,29 @@ claude plugin tag plugins/<your-plugin> --push
 ```
 
 It validates the plugin and creates a `<your-plugin>--v<version>` tag. Dependency ranges are resolved against these tags, so tag dependencies before the plugins that use them: `engineering-paved-path` and `research-tools`, then `architecture-review`, then `sdd-engineering`.
+
+## Catalog site
+
+The catalog website (<https://dmitrii1600.github.io/dev-team-ai-engineering-marketplace/>) lives in [`site/`](site/README.md) and is built from the repository itself.
+
+- **It updates automatically after merge.** A push to `main` that touches `plugins/`, `.claude-plugin/`, `README.md` or `site/` runs `.github/workflows/site.yml`, which lints, tests, builds and deploys the site. There is nothing to edit by hand for a new skill, agent or plugin; the site reads their frontmatter, `plugin.json` and `CHANGELOG.md`.
+- **Keep `CHANGELOG.md` in the Keep a Changelog format** (`## [x.y.z] - YYYY-MM-DD`, then `### Added` / `### Changed` / `### Fixed` lists). The "What's new" feed is built from it; if the format is not recognized, the build prints a warning and that plugin's releases are not shown.
+- **Curated recipes** (collections of artifacts) will be edited in `site/content/recipes.yaml` once they ship; an unknown artifact id will fail the build.
+- **The install commands on the site come from `site/site.config.json` and the marketplace manifest.** The build checks that [README.md](README.md) shows the same `claude plugin marketplace add ...` command and the same minimum Claude Code version, and fails with a hint if they differ. When you change one, change the other.
+- **Preview locally.** The site is a React single-page app built with Vite. All its data is generated from this repository, and the dev server rebuilds it when you edit `plugins/` or `.claude-plugin/`:
+
+  ```bash
+  cd site
+  npm ci
+  npm run dev        # http://localhost:5173/dev-team-ai-engineering-marketplace/
+  ```
+
+- **Checks before you push** (all of them run in CI on a pull request that touches the site or the catalog sources):
+
+  ```bash
+  npm run lint && npm run typecheck && npm test
+  npm run check      # builds the catalog in memory and validates it against the schema and the README
+  npm run build      # site/dist
+  ```
+
+The website has its own workflow, `.github/workflows/site.yml` ("Site"); `validate.yml` only checks the marketplace. A broken frontmatter or a CHANGELOG the site cannot parse fails the `Site` check on the pull request, before merge. See [site/README.md](site/README.md) for the details.

@@ -5,3 +5,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+  # The catalog website (site/): exact versions are pinned in package.json and package-lock.json.
+  - package-ecosystem: npm
+    directory: /site
+    schedule:
+      interval: monthly

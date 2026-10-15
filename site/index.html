@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>%i18n:meta.appTitle%</title>
+    <meta name="description" content="%i18n:meta.description%" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="alternate" type="application/atom+xml" title="%i18n:meta.feedTitle%" href="%BASE_URL%feed.xml" />
+    <!-- Blocking and external on purpose: applies the theme before first paint and keeps the CSP free of inline scripts. -->
+    <!-- Root-relative, not %BASE_URL%: Vite prefixes the base itself (with %BASE_URL% the dev server doubled it). -->
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>%i18n:meta.noscript%</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

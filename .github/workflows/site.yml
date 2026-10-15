@@ -1,0 +1,91 @@
+name: Site
+
+# The catalog website in site/ (a React single-page app built with Vite). It is separate from the
+# marketplace checks in validate.yml: this workflow only builds, tests and publishes the site.
+on:
+  pull_request:
+    paths:
+      - "site/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "README.md"
+      # The catalog build reuses the frontmatter parser shared with the validator.
+      - ".github/scripts/lib/**"
+      - ".github/workflows/site.yml"
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "README.md"
+      # The catalog build reuses the frontmatter parser shared with the validator.
+      - ".github/scripts/lib/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+# Pull requests: a newer push cancels the older run. Deployments (push to main, manual runs) share
+# one group and are never cancelled once started.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('site-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # actions/configure-pages looks the Pages site up through the API (read only; used on main).
+      pages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+      - name: Lint
+        working-directory: site
+        run: npm run lint
+      - name: Type check
+        working-directory: site
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: site
+        run: npm test
+      # Builds the catalog in memory and checks it against the JSON Schema and the README / site.config.json.
+      - name: Catalog check
+        working-directory: site
+        run: npm run check
+      # Generates public/catalog.json, feed.xml and catalog.schema.json from the repository, then runs
+      # `vite build` and copies index.html to 404.html (GitHub Pages deep-link fallback). Output: site/dist.
+      - name: Build
+        working-directory: site
+        run: npm run build
+      - name: Configure Pages
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

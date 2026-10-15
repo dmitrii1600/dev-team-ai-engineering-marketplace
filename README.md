@@ -4,9 +4,23 @@ A [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugins/creat
 
 ## Plugins
 
-| Plugin | Description | Version |
-|---|---|---|
-| [dev-workflow](plugins/dev-workflow) | Conventional Commits messages and a read-only code reviewer agent | 0.1.0 |
+| Plugin | Description | Depends on | Version |
+|---|---|---|---|
+| [architecture-review](plugins/architecture-review) | Read-only architecture boundary review agent | engineering-paved-path | 1.0.0 |
+| [dev-workflow](plugins/dev-workflow) | Conventional Commits messages and a read-only code reviewer agent | — | 0.1.0 |
+| [engineering-paved-path](plugins/engineering-paved-path) | Shared React, Next.js, Fastify, architecture, testing and security skills | — | 1.0.0 |
+| [research-tools](plugins/research-tools) | Read-only researcher agent for codebase and external questions | — | 1.0.0 |
+| [sdd-engineering](plugins/sdd-engineering) | Spec Driven Development: spec → plan → build → verify through a chain of agents | architecture-review, engineering-paved-path, research-tools | 1.0.0 |
+
+Dependencies are installed and enabled automatically: `claude plugin install sdd-engineering@dev-team-ai-engineering-marketplace` brings in the other three.
+
+```mermaid
+flowchart LR
+  sdd[sdd-engineering] --> epp[engineering-paved-path]
+  sdd --> rt[research-tools]
+  sdd --> ar[architecture-review]
+  ar --> epp
+```
 
 ## Installation
 
@@ -71,8 +85,11 @@ plugins/<name>/                   one directory per plugin
   skills/<skill>/SKILL.md
   agents/*.md
   hooks/hooks.json, .mcp.json     (when needed)
+  evals/                          eval cases and fixtures (when present)
   README.md, CHANGELOG.md
+evals/                            shared eval harness for plugin skills and agents (not shipped)
 .github/                          CI, CODEOWNERS, PR template
+docs/specs/                       specifications
 ```
 
 ## Contributing

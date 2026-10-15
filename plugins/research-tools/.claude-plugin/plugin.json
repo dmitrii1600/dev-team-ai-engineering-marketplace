@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "research-tools",
+  "displayName": "Research Tools",
+  "version": "1.0.0",
+  "description": "Read-only researcher agent: answers a concrete question about the codebase or from external docs, with path:line or URL evidence and an explicit list of what it could not establish.",
+  "author": {
+    "name": "Dmytro Shevchenko",
+    "url": "https://github.com/dmitrii1600"
+  },
+  "homepage": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace/tree/main/plugins/research-tools",
+  "repository": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace",
+  "keywords": ["research", "agents", "codebase-search", "documentation"]
+}

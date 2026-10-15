@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "sdd-engineering",
+  "displayName": "SDD Engineering",
+  "version": "1.0.0",
+  "description": "Spec Driven Development: spec, plan, build and verify through a chain of agents.",
+  "author": {
+    "name": "Dmytro Shevchenko",
+    "url": "https://github.com/dmitrii1600"
+  },
+  "homepage": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace/tree/main/plugins/sdd-engineering",
+  "repository": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace",
+  "keywords": ["sdd", "specs", "planning", "agents", "workflow", "ears", "verification"],
+  "dependencies": [
+    { "name": "engineering-paved-path", "version": "^1.0.0" },
+    { "name": "research-tools", "version": "^1.0.0" },
+    { "name": "architecture-review", "version": "^1.0.0" }
+  ]
+}

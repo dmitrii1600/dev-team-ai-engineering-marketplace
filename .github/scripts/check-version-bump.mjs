@@ -19,6 +19,8 @@ const changedPlugins = new Map();
 for (const file of changed) {
   const m = file.match(/^plugins\/([^/]+)\/(.+)$/);
   if (!m) continue;
+  // Eval cases and fixtures do not change what users run.
+  if (m[2].startsWith("evals/")) continue;
   if (!changedPlugins.has(m[1])) changedPlugins.set(m[1], new Set());
   changedPlugins.get(m[1]).add(m[2]);
 }

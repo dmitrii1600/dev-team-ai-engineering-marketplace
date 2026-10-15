@@ -12,4 +12,9 @@
 **/bin/                        @dmitrii1600
 
 # Per-plugin owners.
-/plugins/dev-workflow/         @dmitrii1600
+/plugins/architecture-review/   @dmitrii1600
+/plugins/dev-workflow/          @dmitrii1600
+/plugins/engineering-paved-path/ @dmitrii1600
+/plugins/research-tools/        @dmitrii1600
+/plugins/sdd-engineering/       @dmitrii1600
+/evals/                         @dmitrii1600

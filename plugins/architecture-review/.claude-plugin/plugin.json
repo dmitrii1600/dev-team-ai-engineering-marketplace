@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "architecture-review",
+  "displayName": "Architecture Review",
+  "version": "1.0.0",
+  "description": "Read-only architecture boundary review: layers, placement and imports checked against the paved-path architecture skills and the project's conventions, with path:line evidence and an advisory verdict.",
+  "author": {
+    "name": "Dmytro Shevchenko",
+    "url": "https://github.com/dmitrii1600"
+  },
+  "homepage": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace/tree/main/plugins/architecture-review",
+  "repository": "https://github.com/dmitrii1600/dev-team-ai-engineering-marketplace",
+  "keywords": ["architecture", "code-review", "onion-architecture", "agents"],
+  "dependencies": [
+    { "name": "engineering-paved-path", "version": "^1.0.0" }
+  ]
+}

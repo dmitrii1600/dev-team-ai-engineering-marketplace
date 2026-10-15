@@ -143,9 +143,9 @@ The optimization **fails the pass criterion** for this lab: the quality gate is 
 cost and latency did not really go down. The saving on review-only responses is offset by the
 on-demand read on the plan path.
 
-What the change does buy is one source of truth for the plan format instead of two copies that
-can drift apart. That is a maintenance argument, not a cost one, and it is the reviewer's call
-whether to keep `f296daf` for that reason or revert it.
+`f296daf` is **kept anyway**, for a maintenance reason, not a cost one: the plan format now
+has one source of truth instead of two copies that can drift apart. It is not counted as a
+cost optimization.
 
 Next candidates, not tried here (one change at a time):
 

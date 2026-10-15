@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.0.1] - 2026-10-15
+
+### Changed
+
+- Agent `implementation-planner`: the plan file template, the Plan Report template and the step and track rules now live only in `skills/run-plan/references/plan-format.md`, which the planner reads before writing a plan (not for a review-only response). The agent prompt is about 25% shorter.
+
 ## [1.0.0] - 2026-10-15
 
 ### Added

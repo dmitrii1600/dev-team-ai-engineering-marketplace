@@ -210,15 +210,45 @@ Changes only under `plugins/*/evals/` do not require a plugin version bump.
 ## Statistics tools
 
 ```bash
-npm run eval:repeat -- plugins/sdd-engineering/evals/plan-verifier -n 2 --label before
+npm run eval:repeat -- plugins/sdd-engineering/evals/plan-verifier -n 5 --allow-more --label before
 # edit the agent …
-npm run eval:repeat -- plugins/sdd-engineering/evals/plan-verifier -n 2 --label after
-npm run eval:delta -- before after         # which practices moved
+npm run eval:repeat -- plugins/sdd-engineering/evals/plan-verifier -n 5 --allow-more --label after
+npm run eval:delta -- before after         # which practices moved, and how the metrics shifted
 
 npm run eval:benchmark -- plugins/sdd-engineering/evals/spec-creator -n 3   # lift vs no artifact
 npm run eval:compare                       # pass/fail flips between the last two runs
 npm run test:unit                          # the statistics unit tests (no model)
 ```
+
+`eval:repeat` caps `-n` at 2 to bound token spend; `-n 5` without `--allow-more` prints a warning
+and runs 2. Pass `--allow-more` to run all `n`. A median over 2 samples says little, so use 5 or
+more for a cost baseline.
+
+### Recorded metrics
+
+Every run appends these to `results/records.jsonl` (`metrics`, plus `num_turns`):
+
+| Metric | Meaning |
+|---|---|
+| `inputTokens` / `outputTokens` | uncached input and output tokens |
+| `cacheReadTokens` / `cacheCreationTokens` | input tokens read from / written to the prompt cache |
+| `apiCalls` | distinct API responses (the SDK streams one message per content block; blocks of one response share an id and are counted once) |
+| `toolCallCount` | `tool_use` blocks seen |
+| `numTurns` | turns reported by the SDK |
+| `durationMs` | wall-clock latency |
+| `costUsd` | SDK `total_cost_usd` |
+
+`costUsd` on the **subscription backend is an API-price estimate, not money billed**: nothing is
+charged per token there, so use it to compare runs against each other, not as a bill. On the
+`openrouter` content tier it is OpenRouter's `usage.cost` (0 if the gateway omits it). Token counts
+include Task subagents (taken from the SDK's per-model usage). A run stopped early by `stopWhen`
+sums what it saw before the stop. Records written before a metric existed read as 0 for it.
+
+`repeat` and `benchmark` summarize each metric as **median [min–max]** with mean ± stddev as the
+secondary figure; the median is the headline because a single slow or retried run skews the mean.
+`eval:repeat --label X` saves all of it to `results/repeat-X.json`, and `eval:delta` shows the
+per-metric median change (absolute and %) and whether the candidate's median falls outside the
+baseline's `[min, max]` (`outside baseline range`) or inside it (`within noise`).
 
 Everything is written to `evals/results/` (git-ignored, append-only, safe to delete): per-run rows
 in `records.jsonl`, full outputs in `outputs/<run>/`, the trend log in `history.jsonl`.

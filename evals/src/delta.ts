@@ -1,7 +1,8 @@
 /**
  * Delta between two labeled `eval:repeat --label X` series — the "before vs after a change"
  * view, each side backed by N runs. Diffs at three levels: per-test pass rate, per-practice
- * (the primary signal — which practice improved/regressed), and metrics.
+ * (the primary signal — which practice improved/regressed), and metrics (median change, and
+ * whether the candidate median falls outside the baseline's [min, max]).
  *
  *   npm run eval:repeat -- plugins/engineering-paved-path/evals/onion-architecture -n 5 --label baseline   # BEFORE the edit
  *   ...edit...
@@ -13,7 +14,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GREEN, RED, DIM, RESET } from "./ansi.js";
 import { RESULTS_DIR } from "./artifacts/paths.js";
-import type { NodeAggregate, Series, Stats } from "./records/stats.js";
+import {
+  formatMetric,
+  METRIC_LABELS,
+  type MetricKey,
+  type NodeAggregate,
+  type Series,
+  type Stats,
+} from "./records/stats.js";
 
 interface RepeatFile {
   label: string;
@@ -45,11 +53,37 @@ function rateRow(indent: string, label: string, a?: Series, b?: Series): void {
   console.log(`${indent}${fmtRate(pa)}% -> ${fmtRate(pb)}%  ${col}Δ ${dStr.padStart(4)}${RESET}  ${label}`);
 }
 
-function metricRow(label: string, a: Stats, b: Stats): void {
-  const d = b.mean - a.mean;
-  const col = d === 0 ? DIM : d < 0 ? GREEN : RED; // fewer tokens/turns/ms is better
-  const sign = d > 0 ? "+" : "";
-  console.log(`      ${label}: ${a.mean.toFixed(0)} -> ${b.mean.toFixed(0)}  ${col}(${sign}${d.toFixed(0)})${RESET}`);
+/** Metrics compared by median; older repeat files lack the cost/cache ones (and `median` itself). */
+const DELTA_METRICS: MetricKey[] = [
+  "apiCalls",
+  "inputTokens",
+  "outputTokens",
+  "cacheReadTokens",
+  "cacheCreationTokens",
+  "costUsd",
+  "numTurns",
+  "toolCallCount",
+  "durationMs",
+];
+
+/**
+ * Median change for one metric, plus whether the candidate's median falls outside the baseline's
+ * observed [min, max] (a rough noise check: inside the range it could just be run-to-run spread).
+ * Skipped when either side has no data for it (e.g. a repeat file saved before the metric existed).
+ */
+function metricRow(key: MetricKey, a?: Stats, b?: Stats): void {
+  if (!a || !b || a.median === undefined || b.median === undefined || a.n === 0 || b.n === 0) return;
+  const f = (v: number) => formatMetric(key, v);
+  const d = b.median - a.median;
+  const col = d === 0 ? DIM : d < 0 ? GREEN : RED; // fewer tokens/turns/ms/dollars is better
+  const sign = d > 0 ? "+" : d < 0 ? "-" : "";
+  const pct = a.median === 0 ? "n/a" : `${sign}${Math.abs((d / a.median) * 100).toFixed(0)}%`;
+  const outside = b.median < a.min || b.median > a.max;
+  const verdict = outside ? `${col}outside baseline range${RESET}` : `${DIM}within noise${RESET}`;
+  console.log(
+    `      ${METRIC_LABELS[key].padEnd(11)}: ${f(a.median)} -> ${f(b.median)}  ` +
+      `${col}(${sign}${f(Math.abs(d))}, ${pct})${RESET}  ${verdict} ${DIM}[${f(a.min)}–${f(a.max)}]${RESET}`,
+  );
 }
 
 function main(): void {
@@ -82,9 +116,7 @@ function main(): void {
       rateRow("      ", t, ta?.practices[text], tb?.practices[text]);
     }
     if (ta && tb) {
-      metricRow("tok_out ", ta.metrics.outputTokens, tb.metrics.outputTokens);
-      metricRow("turns   ", ta.metrics.numTurns, tb.metrics.numTurns);
-      metricRow("duration", ta.metrics.durationMs, tb.metrics.durationMs);
+      for (const key of DELTA_METRICS) metricRow(key, ta.metrics[key], tb.metrics[key]);
     }
   }
 }

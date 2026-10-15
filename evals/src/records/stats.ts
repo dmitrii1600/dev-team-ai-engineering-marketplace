@@ -13,6 +13,8 @@ const RECORDS = join(RESULTS_DIR, "records.jsonl");
 
 export interface Stats {
   mean: number;
+  /** Middle value (mean of the two middle values for even n) — robust to a single outlier run. */
+  median: number;
   stddev: number;
   min: number;
   max: number;
@@ -22,12 +24,14 @@ export interface Stats {
 /** Sample standard deviation (n−1). Empty → all zeros with n=0; consumers decide by `n`. */
 export function calcStats(values: number[]): Stats {
   const n = values.length;
-  if (n === 0) return { mean: 0, stddev: 0, min: 0, max: 0, n: 0 };
+  if (n === 0) return { mean: 0, median: 0, stddev: 0, min: 0, max: 0, n: 0 };
   const mean = values.reduce((a, b) => a + b, 0) / n;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[n - 1];
+  const median = n % 2 === 1 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
   const stddev = n < 2 ? 0 : Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
-  return { mean, stddev, min, max, n };
+  return { mean, median, stddev, min, max, n };
 }
 
 export interface PracticeVerdict {
@@ -50,7 +54,17 @@ export interface EvalRecord {
   practices: PracticeVerdict[];
   grounded?: number;
   num_turns: number;
-  metrics: { durationMs: number; inputTokens: number; outputTokens: number; toolCallCount: number };
+  /** The cache/apiCalls/costUsd fields are absent in records written before they were tracked. */
+  metrics: {
+    durationMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheCreationTokens?: number;
+    apiCalls?: number;
+    toolCallCount: number;
+    costUsd?: number;
+  };
   trace: { tools: string[]; subagents: string[]; skills: string[]; reads: string[] };
   output_file: string;
 }
@@ -85,13 +99,45 @@ export interface NodeAggregate {
   pass: Series;
   /** Per practice text → pass series across the runs. Empty for workflow (no judge). */
   practices: Record<string, Series>;
-  metrics: {
-    durationMs: Stats;
-    inputTokens: Stats;
-    outputTokens: Stats;
-    numTurns: Stats;
-    toolCallCount: Stats;
-  };
+  metrics: Record<MetricKey, Stats>;
+}
+
+/** Every per-run metric that `aggregate` summarizes, in display order. */
+export const METRIC_KEYS = [
+  "numTurns",
+  "apiCalls",
+  "toolCallCount",
+  "durationMs",
+  "inputTokens",
+  "outputTokens",
+  "cacheReadTokens",
+  "cacheCreationTokens",
+  "costUsd",
+] as const;
+export type MetricKey = (typeof METRIC_KEYS)[number];
+
+/** Short display names for console output. */
+export const METRIC_LABELS: Record<MetricKey, string> = {
+  numTurns: "turns",
+  apiCalls: "api_calls",
+  toolCallCount: "tool_calls",
+  durationMs: "duration",
+  inputTokens: "tok_in",
+  outputTokens: "tok_out",
+  cacheReadTokens: "cache_read",
+  cacheCreationTokens: "cache_write",
+  costUsd: "cost_usd",
+};
+
+/** Render one metric value: cost with 4 decimals (`$0.0123`), everything else as a rounded integer. */
+export function formatMetric(key: MetricKey, value: number): string {
+  return key === "costUsd" ? `$${value.toFixed(4)}` : value.toFixed(0);
+}
+
+/** One record's value for a metric; a field missing from an older record counts as 0. */
+function metricValue(r: EvalRecord, key: MetricKey): number {
+  const v = key === "numTurns" ? r.num_turns : r.metrics?.[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
 /** Aggregate a flat record list into per-nodeid stats. Pass a single config's records. */
@@ -124,13 +170,9 @@ export function aggregate(records: EvalRecord[]): Record<string, NodeAggregate> 
       label: rows[rows.length - 1].label,
       pass: series(passed, rows.length),
       practices,
-      metrics: {
-        durationMs: calcStats(rows.map((r) => r.metrics?.durationMs ?? 0)),
-        inputTokens: calcStats(rows.map((r) => r.metrics?.inputTokens ?? 0)),
-        outputTokens: calcStats(rows.map((r) => r.metrics?.outputTokens ?? 0)),
-        numTurns: calcStats(rows.map((r) => r.num_turns ?? 0)),
-        toolCallCount: calcStats(rows.map((r) => r.metrics?.toolCallCount ?? 0)),
-      },
+      metrics: Object.fromEntries(
+        METRIC_KEYS.map((k) => [k, calcStats(rows.map((r) => metricValue(r, k)))]),
+      ) as Record<MetricKey, Stats>,
     };
   }
   return out;

@@ -1,6 +1,6 @@
 /**
  * Benchmark a skill/agent's LIFT: run a pattern N times with the artifact injected (candidate)
- * and N times without it (baseline: raw model), then report mean ± stddev / min / max per
+ * and N times without it (baseline: raw model), then report median [min–max] and mean ± stddev per
  * configuration, the delta, a per-practice matrix, and deterministic analyst flags. This is the
  * with_skill vs without_skill comparison from skill-creator v2.
  *
@@ -67,7 +67,8 @@ function summarize(records: EvalRecord[]) {
 }
 
 const pct = (r: number) => `${Math.round(r * 100)}%`;
-const cell = (s: Stats) => `${s.mean.toFixed(0)} ± ${s.stddev.toFixed(0)} [${s.min}–${s.max}] (n=${s.n})`;
+const cell = (s: Stats) =>
+  `${s.median.toFixed(0)} [${s.min}–${s.max}] · mean ${s.mean.toFixed(0)} ± ${s.stddev.toFixed(0)} (n=${s.n})`;
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);

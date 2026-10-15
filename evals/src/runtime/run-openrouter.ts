@@ -34,6 +34,8 @@ export async function runOpenRouter(prompt: string, opts: RunOptions = {}): Prom
   let text = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let costUsd = 0;
   let isError = false;
   try {
     const res = await client.chat.completions.create({
@@ -51,8 +53,16 @@ export async function runOpenRouter(prompt: string, opts: RunOptions = {}): Prom
       throw new Error(`OpenRouter returned no choices${errMsg ? `: ${errMsg}` : ""}`);
     }
     text = choice.message?.content ?? "";
-    inputTokens = res.usage?.prompt_tokens ?? 0;
-    outputTokens = res.usage?.completion_tokens ?? 0;
+    // OpenAI-style prompt_tokens INCLUDES cached tokens; Metrics.inputTokens excludes them (the
+    // Anthropic convention), so subtract to keep the two runtimes comparable.
+    const usage = res.usage as
+      | (NonNullable<typeof res.usage> & { cost?: number; prompt_tokens_details?: { cached_tokens?: number } })
+      | undefined;
+    cacheReadTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+    inputTokens = Math.max(0, (usage?.prompt_tokens ?? 0) - cacheReadTokens);
+    outputTokens = usage?.completion_tokens ?? 0;
+    // OpenRouter reports the real charge in usage.cost; other gateways omit it.
+    costUsd = usage?.cost ?? 0;
   } catch (err) {
     isError = true;
     text = err instanceof Error ? err.message : String(err);
@@ -66,6 +76,15 @@ export async function runOpenRouter(prompt: string, opts: RunOptions = {}): Prom
     filesRead: [],
     numTurns: 1,
     isError,
-    metrics: { durationMs: Date.now() - started, inputTokens, outputTokens, toolCallCount: 0 },
+    metrics: {
+      durationMs: Date.now() - started,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens: 0, // the OpenAI-compatible response has no cache-write count
+      apiCalls: 1,
+      toolCallCount: 0,
+      costUsd,
+    },
   };
 }
